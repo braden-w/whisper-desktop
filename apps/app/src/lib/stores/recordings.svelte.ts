@@ -140,9 +140,29 @@ export const recordings = Effect.gen(function* () {
 							),
 						);
 
+					// postprocess if replacements are defined
+					const replacementMap = settings.value.replacementMap;
+					let processedText = transcribedText;
+					if (replacementMap) {
+						const pattern = new RegExp(
+							'\\b(' +
+								Object.keys(replacementMap)
+									//escape special characters and wrap each word with word boundaries
+									.map((key) => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+									.join('|') +
+								')\\b',
+							'gi',
+						);
+
+						processedText = processedText.replace(pattern, (match) => {
+							console.log('match: ', match.toLowerCase());
+							return replacementMap[match.toLowerCase()] ?? match;
+						});
+					}
+
 					yield* updateRecording({
 						...recording,
-						transcribedText,
+						transcribedText: processedText,
 						transcriptionStatus: 'DONE',
 					});
 

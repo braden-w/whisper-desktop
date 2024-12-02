@@ -53,6 +53,9 @@ export const settingsSchema = S.Struct({
 
 	currentLocalShortcut: S.String,
 	currentGlobalShortcut: S.String,
+	replacementMap: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
+		default: () => ({}),
+	}),
 });
 
 export const getDefaultSettings = (platform: 'app' | 'extension') =>
@@ -75,7 +78,8 @@ export const getDefaultSettings = (platform: 'app' | 'extension') =>
 
 		currentLocalShortcut: 'space',
 		currentGlobalShortcut: platform === 'app' ? 'CommandOrControl+Shift+;' : '',
-	}) satisfies Settings;
+		replacementMap: {},
+	} satisfies Settings);
 
 export type Settings = S.Schema.Type<typeof settingsSchema>;
 
