@@ -10,6 +10,41 @@ import { TranscriptionService, WhisperingError } from '@repo/shared';
 import { Effect, Layer } from 'effect';
 import { WhisperResponseSchema } from './transcription/WhisperResponseSchema';
 
+import ffmpeg from 'fluent-ffmpeg';
+import { PassThrough } from 'stream';
+
+const convertAudioBlobToMp3 = async (audioBlob: Blob): Promise<Blob> => {
+  return new Promise(async (resolve, reject) => {
+    // Convert Blob to Readable Stream
+    const inputStream = new PassThrough();
+    inputStream.end(Buffer.from(await audioBlob.arrayBuffer()));
+
+    const outputStream = new PassThrough();
+    const chunks: Buffer[] = [];
+
+    outputStream.on('data', (chunk) => chunks.push(chunk));
+    outputStream.on('end', () => {
+      const outputBuffer = Buffer.concat(chunks);
+      resolve(new Blob([outputBuffer], { type: 'audio/mpeg' }));
+    });
+    outputStream.on('error', (err) => {
+      reject(new Error('Error during audio processing: ' + err.message));
+    });
+
+    // Use ffmpeg to process the input stream and pipe to output stream
+    ffmpeg(inputStream)
+      .format('mp3') // Convert to MP3
+      .audioCodec('libmp3lame') // Specify MP3 codec
+      .on('error', (err: { message: string }) => {
+        reject(new Error('FFmpeg processing error: ' + err.message));
+      })
+	  .audioBitrate(64)
+      .pipe(outputStream, { end: true });
+  });
+};
+
+
+
 const MAX_FILE_SIZE_MB = 25 as const;
 
 export const TranscriptionServiceGroqLive = Layer.succeed(
@@ -43,17 +78,15 @@ export const TranscriptionServiceGroqLive = Layer.succeed(
 					});
 				}
 				const blobSizeInMb = audioBlob.size / (1024 * 1024);
+				let processedBlob = audioBlob;
 				if (blobSizeInMb > MAX_FILE_SIZE_MB) {
-					return yield* new WhisperingError({
-						title: `The file size (${blobSizeInMb}MB) is too large`,
-						description: `Please upload a file smaller than ${MAX_FILE_SIZE_MB}MB.`,
-						action: { type: 'none' },
-					});
+					processedBlob = yield* Effect.promise(() => convertAudioBlobToMp3(audioBlob));
 				}
+				
 				const formDataFile = new File(
-					[audioBlob],
-					`recording.${getExtensionFromAudioBlob(audioBlob)}`,
-					{ type: audioBlob.type },
+					[processedBlob],
+					`recording.${getExtensionFromAudioBlob(processedBlob)}`,
+					{ type: processedBlob.type },
 				);
 				const formData = new FormData();
 				formData.append('file', formDataFile);

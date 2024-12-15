@@ -7,18 +7,41 @@ import {
 	MoonIcon,
 	SlidersVerticalIcon,
 	SunIcon,
+	UploadIcon,
 } from '$lib/components/icons';
 import { cn } from '$lib/utils';
 import { LogicalSize, getCurrentWindow } from '@tauri-apps/api/window';
 import { toggleMode } from 'mode-watcher';
+import { recorder } from '$lib/stores/recorder.svelte';
+import { Effect } from 'effect';
 
 let { class: className }: { class?: string } = $props();
+
+let fileInput: HTMLInputElement;
+
+function handleFileUpload(event: Event) {
+	const input = event.target as HTMLInputElement;
+		if (input.files && input.files.length > 0) {
+			const file = input.files[0];
+
+			const uploadEffect = recorder.uploadRecording(file);
+			Effect.runPromise(uploadEffect);
+		}
+}
 </script>
 
 <nav class={cn('flex items-center', className)} style="view-transition-name: nav">
 	<WhisperingButton tooltipText="Recordings" href="/recordings" variant="ghost" size="icon">
 		<ListIcon class="h-4 w-4" aria-hidden="true" />
 	</WhisperingButton>
+	<WhisperingButton
+    tooltipText="Upload audio file"
+    onclick={() => fileInput.click()}
+    variant="ghost"
+    size="icon"
+  >
+    <UploadIcon class="h-4 w-4" aria-hidden="true" />
+    </WhisperingButton>
 	<WhisperingButton tooltipText="Settings" href="/settings" variant="ghost" size="icon">
 		<SlidersVerticalIcon class="h-4 w-4" aria-hidden="true" />
 	</WhisperingButton>
@@ -50,4 +73,11 @@ let { class: className }: { class?: string } = $props();
 			<Minimize2Icon class="h-4 w-4" aria-hidden="true" />
 		</WhisperingButton>
 	{/if}
+	<input
+    type="file"
+    accept="audio/*, video/*"
+    onchange={handleFileUpload}
+    bind:this={fileInput}
+    style="display: none;"
+ 	/>
 </nav>

@@ -15,6 +15,7 @@ import type { Recording } from '../services/RecordingDbService';
 import stopSoundSrc from './assets/sound_ex_machina_Button_Blip.mp3';
 import startSoundSrc from './assets/zapsplat_household_alarm_clock_button_press_12967.mp3';
 import cancelSoundSrc from './assets/zapsplat_multimedia_click_button_short_sharp_73510.mp3';
+import { toast } from '$lib/services/ToastService';
 
 const startSound = new Audio(startSoundSrc);
 const stopSound = new Audio(stopSoundSrc);
@@ -142,5 +143,45 @@ export const recorder = Effect.gen(function* () {
 					yield* setAlwaysOnTop(false);
 				}
 			}).pipe(Effect.runPromise),
+		
+		uploadRecording: (file: File) =>
+			Effect.gen(function* () {
+				  if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+					if (settings.value.isPlaySoundEnabled) {
+						if (!document.hidden) {
+							cancelSound.play();
+						} else {
+							yield* sendMessageToExtension({
+								name: 'whispering-extension/playSound',
+								body: { sound: 'cancel' },
+							});
+						}
+					}
+					yield* toast({
+						variant: 'error',
+						title: 'Invalid file type',
+						description: 'Please upload an audio file.',
+					});
+					recorderState.value = 'IDLE';
+					return;
+				  }
+		  
+				  const arrayBuffer = yield* Effect.tryPromise(() => file.arrayBuffer());
+				  const audioBlob = new Blob([arrayBuffer], { type: file.type });
+		  
+				  const newRecording: Recording = {
+					id: nanoid(),
+					title: file.name,
+					subtitle: '',
+					timestamp: new Date().toISOString(),
+					transcribedText: '',
+					blob: audioBlob,
+					transcriptionStatus: 'UNPROCESSED',
+				  };
+		  
+				  yield* recordings.addRecording(newRecording);
+				  yield* recordings.transcribeRecording(newRecording.id);
+				}),
+			
 	};
 }).pipe(Effect.provide(MainLive), Effect.runSync);
