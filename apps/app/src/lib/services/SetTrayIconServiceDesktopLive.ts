@@ -33,7 +33,7 @@ export const SetTrayIconServiceDesktopLive = Layer.effect(
 				id: 'tray',
 				icon: await getIconPath('IDLE'),
 				menu: trayMenu,
-				tooltip: 'Your App Name',
+				tooltip: 'Whispering',
 				action: (e) => {
 					if ('click' in e) {
 						recorder.toggleRecording();
